@@ -156,13 +156,15 @@ export default function App() {
   const potPaid = players.filter((p) => p.paid).length * BUYIN;
   const aliveCount = (p) => p.picks.filter((id) => statusOf(id) !== "out").length;
   const teamsIn = teams.filter((t) => t.status !== "out").length;
+  const claimed = players.reduce((n, p) => n + p.picks.length, 0);
+  const allDrawn = claimed >= 48;
   const liveMatches = matches.filter(isLive);
   let curStage = "GROUP_STAGE";
   for (const s of STAGE_ORDER) if (matches.some((m) => m.stage === s && m.status !== "SCHEDULED" && m.status !== "TIMED")) curStage = s;
   const championSet = !!config.champion_team_id;
 
   return (
-    <div className="wc" style={{ background: C.bg, minHeight: "100vh", color: C.text }}>
+    <div className="wc" style={{ background: `radial-gradient(1100px 520px at 50% -8%, rgba(123,47,247,.30), transparent 60%), radial-gradient(820px 430px at 92% 6%, rgba(0,210,198,.16), transparent 55%), radial-gradient(720px 380px at 5% 28%, rgba(255,45,120,.13), transparent 55%), ${C.bg}`, minHeight: "100vh", color: C.text }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap');
         .wc,.wc *{font-family:'Montserrat',system-ui,-apple-system,sans-serif;box-sizing:border-box}
         @keyframes pop{0%{transform:scale(.92);opacity:0}100%{transform:scale(1);opacity:1}}
@@ -171,7 +173,8 @@ export default function App() {
         @keyframes shimmer{0%{background-position:0% 50%}100%{background-position:200% 50%}}
         .herog{background-size:200% 200%;animation:shimmer 8s linear infinite alternate}
         @keyframes fall{0%{transform:translateY(-12vh) rotate(0);opacity:1}100%{transform:translateY(110vh) rotate(540deg);opacity:.9}}
-        .confetti{position:absolute;top:-5vh;width:9px;height:14px;border-radius:2px;animation:fall linear infinite}`}</style>
+        .confetti{position:absolute;top:-5vh;width:9px;height:14px;border-radius:2px;animation:fall linear infinite}
+        @keyframes mq{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}.marquee{animation:mq 32s linear infinite}`}</style>
 
       {championSet && !reduced.current && <Confetti />}
 
@@ -187,10 +190,10 @@ export default function App() {
             <button onClick={loadAll} style={{ background: "rgba(255,255,255,.18)", border: "none", borderRadius: 10, padding: 9, color: "#fff", cursor: "pointer" }}><RefreshCw size={16} /></button>
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-            <Stat label="TEAMS IN" value={`${teamsIn}`} sub={`/48`} />
-            <Stat label="STAGE" value={stageShort(curStage)} small />
-            <Stat label="POT (KSh)" value={potPaid.toLocaleString()} />
             <Stat label="SLOTS" value={`${players.length}`} sub={`/${MAX}`} />
+            <Stat label={allDrawn ? "TEAMS ALIVE" : "TEAMS LEFT"} value={`${allDrawn ? teamsIn : 48 - claimed}`} sub="/48" />
+            <Stat label="PRIZE KSh" value="24,000" small />
+            <Stat label="STAGE" value={stageShort(curStage)} small />
           </div>
           {liveMatches.length > 0 && (
             <div style={{ marginTop: 12, background: "rgba(0,0,0,.28)", borderRadius: 12, padding: "8px 12px", display: "flex", alignItems: "center", gap: 8 }}>
@@ -199,8 +202,9 @@ export default function App() {
           )}
         </div>
 
+        <FlagMarquee teams={teams} />
         <div style={{ padding: "16px 14px 0" }}>
-          {tab === "draw" && <DrawView {...{ players, teams, myName, setMyName, reduced, onDone: loadAll }} />}
+          {tab === "draw" && <DrawView {...{ players, teams, teamMap, myName, setMyName, reduced, onDone: loadAll }} />}
           {tab === "mine" && <MineView {...{ players, teamMap, statusOf, aliveCount, myName, setMyName }} />}
           {tab === "pool" && <PoolView {...{ players, teamMap, statusOf, aliveCount, championSet }} />}
           {tab === "matches" && <MatchesView {...{ matches, standings, teams, players, statusOf, teamMap }} />}
@@ -226,6 +230,17 @@ export default function App() {
     </div>
   );
 }
+function FlagMarquee({ teams }) {
+  if (!teams.length) return null;
+  const row = [...teams, ...teams];
+  return (
+    <div style={{ overflow: "hidden", padding: "7px 0", background: "#0c1426", borderBottom: `1px solid ${C.line}` }}>
+      <div className="marquee" style={{ display: "flex", gap: 14, fontSize: 19, width: "max-content", paddingLeft: 14 }}>
+        {row.map((t, i) => <span key={i}>{t.flag}</span>)}
+      </div>
+    </div>
+  );
+}
 function Stat({ label, value, sub, small }) {
   return (
     <div style={{ flex: 1, background: "rgba(255,255,255,.14)", borderRadius: 12, padding: "9px 8px", textAlign: "center" }}>
@@ -235,25 +250,52 @@ function Stat({ label, value, sub, small }) {
   );
 }
 
-/* ---------- Draw ---------- */
-function DrawView({ players, teams, myName, setMyName, reduced, onDone }) {
-  const [phase, setPhase] = useState("intro");
+/* ---------- Draw (pay -> confirm -> reveal) ---------- */
+function DrawView({ players, teams, teamMap, myName, setMyName, reduced, onDone }) {
+  const [phase, setPhase] = useState("intro"); // intro|pending|ready|reveal|done
   const [reel, setReel] = useState(teams[0]);
   const [result, setResult] = useState([]);
   const [shown, setShown] = useState(0);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const me = players.find((p) => p.name.toLowerCase() === myName.trim().toLowerCase());
   const full = players.length >= MAX;
+  const chips = (ids) => ids.map((id) => ({ team_id: id, team_name: teamMap[id]?.name, flag: teamMap[id]?.flag }));
 
-  async function start() {
+  // live-advance: when the organiser confirms payment, or a draw already happened
+  useEffect(() => {
+    if (!me) return;
+    if (me.picks.length >= 2 && phase !== "reveal" && phase !== "done") { setResult(chips(me.picks)); setShown(2); setPhase("done"); }
+    else if (me.approved && me.picks.length === 0 && phase === "pending") { setPhase("ready"); }
+  }, [me, phase]);
+
+  async function cont() {
     setErr("");
-    if (!myName.trim()) return setErr("Enter your name to start.");
+    const name = myName.trim();
+    if (!name) return setErr("Enter your name.");
+    if (me) {
+      if (me.picks.length >= 2) { setResult(chips(me.picks)); setShown(2); setPhase("done"); }
+      else if (me.approved) setPhase("ready");
+      else setPhase("pending");
+      return;
+    }
+    if (full) return setErr("The pool is full — all 24 slots are taken.");
     setBusy(true);
-    const { data, error } = await supabase.rpc("claim_random_teams", { p_name: myName.trim() });
+    const { error } = await supabase.rpc("join_pool", { p_name: name });
     setBusy(false);
     if (error) {
-      const m = { POOL_FULL: "The pool is full — all 24 slots are taken.", NAME_TAKEN: "That name has already drawn. Check My Teams.", NAME_REQUIRED: "Enter your name." };
-      return setErr(m[(error.message.match(/[A-Z_]+/) || [])[0]] || "Could not draw. Try again.");
+      const m = { POOL_FULL: "The pool is full — all 24 slots are taken.", NAME_TAKEN: "That name is already on the list — enter it again to check your status.", NAME_REQUIRED: "Enter your name." };
+      return setErr(m[(error.message.match(/[A-Z_]+/) || [])[0]] || "Could not join. Try again.");
+    }
+    setPhase("pending"); onDone();
+  }
+  async function reveal() {
+    setErr(""); setBusy(true);
+    const { data, error } = await supabase.rpc("claim_teams_approved", { p_name: myName.trim() });
+    setBusy(false);
+    if (error) {
+      const m = { NOT_APPROVED: "Your payment hasn't been confirmed yet.", NOT_JOINED: "Join the pool first." };
+      return setErr(m[(error.message.match(/[A-Z_]+/) || [])[0]] || "Could not reveal. Try again.");
     }
     setResult(data); setShown(0); setPhase("reveal"); spinTo(data[0], () => setShown(1)); onDone();
   }
@@ -270,22 +312,36 @@ function DrawView({ players, teams, myName, setMyName, reduced, onDone }) {
   }
   function revealSecond() { spinTo(result[1], () => { setShown(2); setTimeout(() => setPhase("done"), 500); }); }
 
-  if (full && phase === "intro") return (
-    <Card style={{ textAlign: "center" }}>
-      <Lock size={28} color={C.sub} /><div style={{ fontWeight: 800, marginTop: 8 }}>The draw is full</div>
-      <div style={{ color: C.sub, fontSize: 14, marginTop: 4 }}>All 24 slots are taken. Follow the action in Matches & Pool.</div>
-    </Card>
-  );
   return (
     <div style={{ display: "grid", gap: 14 }}>
       {phase === "intro" && (
         <Card>
-          <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 4 }}>🎟️ Lucky dip</div>
-          <div style={{ color: C.sub, fontSize: 13, marginBottom: 14 }}>Two teams, drawn at random by the system. One go each — picks lock instantly and can’t be swapped.</div>
+          <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 4 }}>🎟️ Join the pool</div>
+          <div style={{ color: C.sub, fontSize: 13, marginBottom: 14 }}>Enter your name to reserve a slot. You pay KSh 1,000, and once the organiser confirms it, your two random teams unlock here. First come, first served — 24 slots. Already joined? Enter your name to check your status.</div>
           <input value={myName} onChange={(e) => setMyName(e.target.value)} placeholder="Your name"
             style={{ width: "100%", padding: "13px 14px", borderRadius: 12, background: "#0c1426", border: `1px solid ${C.line}`, color: C.text, fontSize: 15, marginBottom: 12 }} />
           {err && <div style={{ color: C.red, fontSize: 13, marginBottom: 10 }}>{err}</div>}
-          <Btn full onClick={start} disabled={busy}><Dices size={18} /> {busy ? "Drawing…" : "Reveal my 2 teams"}</Btn>
+          <Btn full onClick={cont} disabled={busy}><ChevronRight size={18} /> {busy ? "…" : "Continue"}</Btn>
+        </Card>
+      )}
+      {phase === "pending" && (
+        <Card style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 36 }}>⏳</div>
+          <div style={{ fontWeight: 900, fontSize: 18, marginTop: 4 }}>Slot reserved, {myName}!</div>
+          <div style={{ color: C.sub, fontSize: 13.5, margin: "10px 0 14px", lineHeight: 1.55 }}>
+            Now send <b style={{ color: C.gold }}>KSh 1,000</b> to <b style={{ color: C.text }}>+254&nbsp;737&nbsp;600&nbsp;380</b> via M-Pesa.<br />Once the organiser confirms your payment, your <b style={{ color: C.text }}>Reveal</b> button unlocks right here. You can close this and come back — just enter your name again.
+          </div>
+          {err && <div style={{ color: C.red, fontSize: 13, marginBottom: 10 }}>{err}</div>}
+          <Btn full kind="ghost" onClick={onDone}><RefreshCw size={16} /> Check again</Btn>
+        </Card>
+      )}
+      {phase === "ready" && (
+        <Card style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 36 }}>✅</div>
+          <div style={{ fontWeight: 900, fontSize: 18, marginTop: 4 }}>Payment confirmed!</div>
+          <div style={{ color: C.sub, fontSize: 13, margin: "6px 0 16px" }}>Time for your lucky dip, {myName}. Two random teams, locked in instantly.</div>
+          {err && <div style={{ color: C.red, fontSize: 13, marginBottom: 10 }}>{err}</div>}
+          <Btn full onClick={reveal} disabled={busy}><Dices size={18} /> {busy ? "Drawing…" : "Reveal my 2 teams"}</Btn>
         </Card>
       )}
       {phase === "reveal" && (
@@ -306,7 +362,7 @@ function DrawView({ players, teams, myName, setMyName, reduced, onDone }) {
         <Card style={{ textAlign: "center", animation: "pop .3s" }}>
           <div style={{ fontSize: 40 }}>🎉</div>
           <div style={{ fontWeight: 900, fontSize: 18, marginTop: 2 }}>You’re in, {myName}!</div>
-          <div style={{ color: C.sub, fontSize: 13, margin: "2px 0 14px" }}>Send KSh 1,000 to +254 737 600 380 to confirm your slot.</div>
+          <div style={{ color: C.sub, fontSize: 13, margin: "2px 0 14px" }}>Locked in — good luck! 🍀</div>
           <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
             {result.map((t) => <TeamChip key={t.team_id} t={{ name: t.team_name, flag: t.flag }} status="active" />)}
           </div>
@@ -362,7 +418,7 @@ function MineView({ players, teamMap, statusOf, aliveCount, myName, setMyName })
 
 /* ---------- Pool (player standings) ---------- */
 function PoolView({ players, teamMap, statusOf, aliveCount, championSet }) {
-  const rows = [...players].sort((a, b) => {
+  const rows = [...players].filter((p) => p.picks.length >= 2).sort((a, b) => {
     const ca = a.picks.some((i) => statusOf(i) === "champion") ? 1 : 0, cb = b.picks.some((i) => statusOf(i) === "champion") ? 1 : 0;
     return cb - ca || aliveCount(b) - aliveCount(a) || a.name.localeCompare(b.name);
   });
@@ -434,41 +490,37 @@ function Fixtures({ matches }) {
 }
 function Groups({ standings, teams, players, statusOf, teamMap }) {
   const ownerOf = (id) => players.find((p) => p.picks.includes(id));
-  const byGroup = {};
-  standings.forEach((s) => { (byGroup[grpLetter(s.grp)] ||= []).push(s); });
-  const hasStandings = standings.length > 0;
+  const stBy = {}; standings.forEach((s) => { if (s.team_id) stBy[s.team_id] = s; });
+  const hasStats = standings.length > 0;
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      {!hasStandings && <Card style={{ color: C.sub, fontSize: 13 }}>Group tables fill in once results sync. Showing teams & owners for now.</Card>}
       {GROUPS.map((g) => {
-        const rows = hasStandings ? (byGroup[g] || []).sort((a, b) => a.position - b.position)
-          : teams.filter((t) => t.grp === g).map((t) => ({ team_id: t.id, team_name: t.name, fallback: true }));
+        const gt = teams.filter((t) => t.grp === g);
+        const ordered = hasStats ? [...gt].sort((a, b) => ((stBy[a.id]?.position ?? 9) - (stBy[b.id]?.position ?? 9))) : gt;
         return (
           <Card key={g} style={{ padding: 12 }}>
             <div style={{ fontWeight: 900, color: C.teal, fontSize: 13, marginBottom: 8 }}>GROUP {g}</div>
-            {hasStandings && (
+            {hasStats && (
               <div style={{ display: "flex", color: C.sub, fontSize: 10, fontWeight: 700, padding: "0 4px 6px", letterSpacing: 0.5 }}>
-                <span style={{ width: 18 }}>#</span><span style={{ flex: 1 }}>TEAM</span><span style={{ width: 28, textAlign: "center" }}>P</span><span style={{ width: 30, textAlign: "center" }}>GD</span><span style={{ width: 30, textAlign: "center" }}>PTS</span>
+                <span style={{ width: 18 }}>#</span><span style={{ flex: 1 }}>TEAM</span><span style={{ width: 26, textAlign: "center" }}>P</span><span style={{ width: 30, textAlign: "center" }}>GD</span><span style={{ width: 30, textAlign: "center" }}>PTS</span>
               </div>
             )}
             <div style={{ display: "grid", gap: 5 }}>
-              {rows.map((r, i) => {
-                const t = r.team_id ? teamMap[r.team_id] : null;
-                const st = r.team_id ? statusOf(r.team_id) : "active";
-                const owner = r.team_id ? ownerOf(r.team_id) : null;
-                const qualifying = hasStandings && r.position <= 2;
+              {ordered.map((t, i) => {
+                const s = stBy[t.id]; const st = statusOf(t.id); const owner = ownerOf(t.id);
+                const qual = hasStats && s && s.position <= 2;
                 return (
-                  <div key={r.team_name + i} style={{ display: "flex", alignItems: "center", background: "#0c1426", border: `1px solid ${qualifying ? C.green + "55" : C.line}`, borderRadius: 9, padding: "8px 4px 8px 0", opacity: st === "out" ? 0.55 : 1 }}>
-                    <span style={{ width: 18, textAlign: "center", color: qualifying ? C.green : C.sub, fontSize: 12, fontWeight: 800 }}>{hasStandings ? r.position : ""}</span>
+                  <div key={t.id} style={{ display: "flex", alignItems: "center", background: "#0c1426", border: `1px solid ${qual ? C.green + "66" : C.line}`, borderRadius: 9, padding: "8px 4px 8px 0", opacity: st === "out" ? 0.5 : 1 }}>
+                    <span style={{ width: 18, textAlign: "center", color: qual ? C.green : C.sub, fontSize: 12, fontWeight: 800 }}>{hasStats ? (s?.position ?? "") : i + 1}</span>
                     <span style={{ flex: 1, display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
-                      <span style={{ fontSize: 16 }}>{t?.flag || "🏳️"}</span>
-                      <span style={{ fontWeight: 700, fontSize: 13, textDecoration: st === "out" ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t?.name || r.team_name}</span>
-                      {owner && <span style={{ color: C.teal, fontSize: 10, fontWeight: 700 }}>· {owner.name}</span>}
+                      <span style={{ fontSize: 17 }}>{t.flag}</span>
+                      <span style={{ fontWeight: 700, fontSize: 13, textDecoration: st === "out" ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
+                      {owner && <span style={{ color: C.teal, fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>· {owner.name}</span>}
                     </span>
-                    {hasStandings && <>
-                      <span style={{ width: 28, textAlign: "center", color: C.sub, fontSize: 12 }}>{r.played ?? 0}</span>
-                      <span style={{ width: 30, textAlign: "center", color: C.sub, fontSize: 12 }}>{r.gd > 0 ? "+" + r.gd : r.gd ?? 0}</span>
-                      <span style={{ width: 30, textAlign: "center", fontWeight: 800, fontSize: 13 }}>{r.points ?? 0}</span>
+                    {hasStats && <>
+                      <span style={{ width: 26, textAlign: "center", color: C.sub, fontSize: 12 }}>{s?.played ?? 0}</span>
+                      <span style={{ width: 30, textAlign: "center", color: C.sub, fontSize: 12 }}>{s ? (s.gd > 0 ? "+" + s.gd : s.gd) : 0}</span>
+                      <span style={{ width: 30, textAlign: "center", fontWeight: 800, fontSize: 13 }}>{s?.points ?? 0}</span>
                     </>}
                   </div>
                 );
@@ -483,7 +535,8 @@ function Groups({ standings, teams, players, statusOf, teamMap }) {
 
 /* ---------- Admin ---------- */
 function AdminView({ teams, players, statusOf, teamMap, config, onDone }) {
-  const [pin, setPin] = useState(""); const [ok, setOk] = useState(false); const [copied, setCopied] = useState(false); const [err, setErr] = useState("");
+  const [pin, setPin] = useState(""); const [ok, setOk] = useState(false); const [copied, setCopied] = useState(false); const [err, setErr] = useState(""); const [pinErr, setPinErr] = useState("");
+  async function unlock() { const { data, error } = await supabase.rpc("admin_check_pin", { p_pin: pin }); if (!error && data === true) { setErr(""); setOk(true); } else setPinErr("Wrong PIN — try again."); }
   const call = async (fn, args) => { const { error } = await supabase.rpc(fn, args); if (error) setErr(error.message); else { setErr(""); onDone(); } };
   function update() {
     const out = teams.filter((t) => statusOf(t.id) === "out");
@@ -504,7 +557,8 @@ function AdminView({ teams, players, statusOf, teamMap, config, onDone }) {
       <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 800, marginBottom: 4 }}><ShieldCheck size={18} color={C.teal} /> Admin access</div>
       <div style={{ color: C.sub, fontSize: 13, marginBottom: 12 }}>Organiser only. Change the default PIN once in.</div>
       <input value={pin} onChange={(e) => setPin(e.target.value)} type="password" placeholder="PIN" style={{ width: "100%", padding: "13px 14px", borderRadius: 12, background: "#0c1426", border: `1px solid ${C.line}`, color: C.text, fontSize: 15, marginBottom: 12 }} />
-      <Btn full onClick={() => setOk(true)}>Unlock</Btn>
+      {pinErr && <div style={{ color: C.red, fontSize: 13, marginBottom: 10 }}>{pinErr}</div>}
+      <Btn full onClick={unlock}>Unlock</Btn>
     </Card>
   );
   return (
@@ -536,17 +590,29 @@ function AdminView({ teams, players, statusOf, teamMap, config, onDone }) {
         </div>
       </Card>
       <Card>
-        <div style={{ fontWeight: 800, marginBottom: 10 }}>Players & buy-ins ({players.length})</div>
+        <div style={{ fontWeight: 800, marginBottom: 4 }}>Players & payments ({players.length})</div>
+        <div style={{ color: C.sub, fontSize: 12, marginBottom: 10 }}>Tap <b style={{ color: C.teal }}>Confirm payment</b> once their KSh 1,000 lands. That unlocks their reveal.</div>
         <div style={{ display: "grid", gap: 6 }}>
-          {players.map((p) => (
-            <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0c1426", border: `1px solid ${C.line}`, borderRadius: 10, padding: "8px 11px" }}>
-              <span style={{ fontWeight: 700, fontSize: 14 }}>{p.name}</span>
-              <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <button onClick={() => call("admin_set_paid", { p_pin: pin, p_pid: p.id, p_paid: !p.paid })} style={{ cursor: "pointer", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, fontWeight: 800, background: p.paid ? C.teal : "#1d2742", color: p.paid ? "#04161a" : C.sub }}>{p.paid ? "Paid" : "Mark paid"}</button>
-                <button onClick={() => window.confirm("Remove player?") && call("admin_remove_player", { p_pin: pin, p_pid: p.id })} style={{ background: "none", border: "none", color: C.sub, cursor: "pointer" }}><X size={16} /></button>
-              </span>
-            </div>
-          ))}
+          {players.length === 0 && <div style={{ color: C.sub, fontSize: 13 }}>No one has joined yet.</div>}
+          {players.map((p) => {
+            const drawn = p.picks.length >= 2;
+            const sub = !p.approved ? "Awaiting payment" : drawn ? "Paid · drawn" : "Paid · not drawn yet";
+            const subc = !p.approved ? C.red : C.teal;
+            return (
+              <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0c1426", border: `1px solid ${C.line}`, borderRadius: 10, padding: "8px 11px" }}>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ fontWeight: 700, fontSize: 14 }}>{p.name}</span>
+                  <span style={{ display: "block", color: subc, fontSize: 11, fontWeight: 600 }}>{sub}</span>
+                </span>
+                <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  {!p.approved
+                    ? <button onClick={() => call("admin_approve", { p_pin: pin, p_pid: p.id, p_val: true })} style={{ cursor: "pointer", border: "none", borderRadius: 8, padding: "6px 11px", fontSize: 12, fontWeight: 800, background: C.teal, color: "#04161a" }}>Confirm payment</button>
+                    : <button onClick={() => window.confirm("Mark this player as unpaid?") && call("admin_approve", { p_pin: pin, p_pid: p.id, p_val: false })} style={{ cursor: "pointer", border: `1px solid ${C.line}`, borderRadius: 8, padding: "6px 10px", fontSize: 12, fontWeight: 700, background: "transparent", color: C.sub }}>✓ Paid</button>}
+                  <button onClick={() => window.confirm("Remove this player and free their slot/teams?") && call("admin_remove_player", { p_pin: pin, p_pid: p.id })} style={{ background: "none", border: "none", color: C.sub, cursor: "pointer" }}><X size={16} /></button>
+                </span>
+              </div>
+            );
+          })}
         </div>
       </Card>
       <Card>
