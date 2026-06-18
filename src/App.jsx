@@ -5,13 +5,13 @@ import {
 } from "lucide-react";
 import { supabase } from "./supabaseClient.js";
 
-const MAX = 24, BUYIN = 1000;
+const MAX = 24, BUYIN = 1000, PRIZE1 = 18000, PRIZE2 = 6000;
 const GROUPS = "ABCDEFGHIJKL".split("");
 const C = {
   bg: "#020817", deep: "#061a35", royal: "#0b5cff", electric: "#38bdf8",
-  panel: "rgba(5,12,25,0.78)", panel2: "rgba(6,26,53,0.62)", line: "rgba(56,189,248,0.25)",
+  panel: "rgba(5,12,25,0.78)", panel2: "rgba(6,26,53,0.62)", line: "rgba(212,175,55,0.25)",
   teal: "#38bdf8", gold: "#d4af37", green: "#22c55e", red: "#ff4d4d",
-  text: "#ffffff", sub: "#9fb0c8", blue: "#0b5cff",
+  text: "#ffffff", sub: "#9fb0c8", blue: "#0b5cff", silver: "#c7ccda",
 };
 const ISO = { mex:"mx", kor:"kr", rsa:"za", cze:"cz", can:"ca", bih:"ba", qat:"qa", sui:"ch", sco:"gb-sct", bra:"br", mar:"ma", hai:"ht", usa:"us", aus:"au", tur:"tr", par:"py", ger:"de", civ:"ci", ecu:"ec", cuw:"cw", swe:"se", ned:"nl", jpn:"jp", tun:"tn", bel:"be", egy:"eg", irn:"ir", nzl:"nz", esp:"es", cpv:"cv", ksa:"sa", uru:"uy", fra:"fr", sen:"sn", nor:"no", irq:"iq", arg:"ar", aut:"at", alg:"dz", jor:"jo", por:"pt", col:"co", uzb:"uz", cod:"cd", eng:"gb-eng", cro:"hr", pan:"pa", gha:"gh" };
 function Flag({ id, size = 14 }) {
@@ -31,10 +31,10 @@ const fmtTime = (d) => new Date(d).toLocaleTimeString(undefined, { hour: "2-digi
 
 /* ---------- atoms ---------- */
 const Card = ({ children, style }) => (
-  <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 20, padding: 16, backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", boxShadow: "0 24px 80px rgba(0,0,0,0.5)", ...style }}>{children}</div>
+  <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 20, padding: 16, backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", boxShadow: "0 24px 80px rgba(0,0,0,0.45)", ...style }}>{children}</div>
 );
 function StatusDot({ s }) {
-  const m = { active: C.teal, out: C.red, champion: C.gold };
+  const m = { active: C.teal, out: C.red, champion: C.gold, runnerup: C.silver };
   return <span style={{ width: 8, height: 8, borderRadius: 99, background: m[s], display: "inline-block" }} />;
 }
 function LiveDot() {
@@ -42,12 +42,12 @@ function LiveDot() {
     <span className="livepulse" style={{ width: 7, height: 7, borderRadius: 99, background: C.red, display: "inline-block" }} />LIVE</span>;
 }
 function Btn({ children, onClick, kind = "primary", disabled, full }) {
-  const grad = { primary: "linear-gradient(135deg,#003b8f,#0b5cff,#38bdf8)", gold: `linear-gradient(90deg,${C.gold},#b8902a)`, red: C.red, ghost: "transparent" }[kind];
+  const grad = { primary: "linear-gradient(135deg,#b8860b,#d4af37,#f5d76e)", gold: "linear-gradient(135deg,#b8860b,#d4af37,#f5d76e)", red: C.red, ghost: "transparent" }[kind];
   const ghost = kind === "ghost";
   return (
     <button onClick={onClick} disabled={disabled} style={{
       background: disabled ? "#1d2742" : grad,
-      color: ghost ? C.text : (kind === "gold" ? "#231600" : "#fff"),
+      color: ghost ? C.text : (kind === "red" ? "#fff" : "#241a00"),
       border: ghost ? `1px solid ${C.line}` : "none", borderRadius: 12, padding: "13px 18px",
       fontWeight: 800, fontSize: 15, cursor: disabled ? "default" : "pointer", width: full ? "100%" : "auto",
       opacity: disabled ? 0.5 : 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
@@ -56,7 +56,7 @@ function Btn({ children, onClick, kind = "primary", disabled, full }) {
   );
 }
 function TeamChip({ t, status, small }) {
-  const col = status === "out" ? C.red : status === "champion" ? C.gold : C.teal;
+  const col = status === "out" ? C.red : status === "champion" ? C.gold : status === "runnerup" ? C.silver : C.teal;
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 6, padding: small ? "3px 8px" : "5px 10px",
@@ -66,6 +66,7 @@ function TeamChip({ t, status, small }) {
     }}>
       <Flag id={t.id} size={small ? 12 : 14} />{t.name}
       {status === "champion" && <Trophy size={12} color={C.gold} />}
+      {status === "runnerup" && <span style={{ fontSize: 11 }}>🥈</span>}
     </span>
   );
 }
@@ -144,7 +145,7 @@ export default function App() {
   const [myName, setMyName] = useState("");
   const reduced = useRef(typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
   const teamMap = useMemo(() => Object.fromEntries(teams.map((t) => [t.id, t])), [teams]);
-  const statusOf = useCallback((id) => (config?.champion_team_id === id ? "champion" : (teamMap[id]?.status || "active")), [config, teamMap]);
+  const statusOf = useCallback((id) => (config?.champion_team_id === id ? "champion" : config?.runnerup_team_id === id ? "runnerup" : (teamMap[id]?.status || "active")), [config, teamMap]);
 
   const loadAll = useCallback(async () => {
     const [{ data: t }, { data: pa }, { data: pk }, { data: cfg }, { data: mt }, { data: st }] = await Promise.all([
@@ -193,15 +194,15 @@ export default function App() {
         .confetti{position:absolute;top:-5vh;width:9px;height:14px;border-radius:2px;animation:fall linear infinite}
         @keyframes mq{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}.marquee{animation:mq 32s linear infinite}`}</style>
 
-      <div style={{ position: "fixed", inset: 0, zIndex: 0, backgroundImage: "linear-gradient(180deg, rgba(2,8,23,.55) 0%, rgba(2,8,23,.74) 50%, rgba(2,8,23,.94) 100%), url('https://images.unsplash.com/photo-1745997645080-941f962f1392?q=80&w=2000&auto=format&fit=crop')", backgroundSize: "cover", backgroundPosition: "center", backgroundColor: C.bg }} />
-      <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", background: "radial-gradient(700px 420px at 8% -8%, rgba(190,215,255,.32), transparent 60%), radial-gradient(700px 420px at 92% -8%, rgba(190,215,255,.28), transparent 60%), radial-gradient(950px 360px at 50% 120%, rgba(34,197,94,.18), transparent 64%), radial-gradient(1050px 720px at 50% 44%, rgba(2,8,23,.58), transparent 70%)" }} />
+      <div style={{ position: "fixed", inset: 0, zIndex: 0, backgroundImage: "linear-gradient(180deg, rgba(2,8,23,.28) 0%, rgba(2,8,23,.44) 45%, rgba(2,8,23,.86) 100%), url('/rivalry.jpg')", backgroundSize: "cover", backgroundPosition: "center top", backgroundColor: C.bg }} />
+      <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", background: "radial-gradient(820px 460px at 50% 6%, rgba(212,175,55,.14), transparent 62%), radial-gradient(1150px 820px at 50% 54%, rgba(2,8,23,.55), transparent 72%)" }} />
       <BgConfetti />
 
       {championSet && !reduced.current && <Confetti />}
 
-      <div style={{ maxWidth: 580, margin: "0 auto", padding: "0 0 96px", position: "relative", zIndex: 1 }}>
+      <div style={{ maxWidth: 820, margin: "0 auto", padding: "0 0 96px", position: "relative", zIndex: 1 }}>
         {/* HERO */}
-        <div style={{ margin: "16px 14px 0", background: "linear-gradient(135deg, rgba(6,26,53,.82), rgba(2,8,23,.72))", border: `1px solid ${C.line}`, borderRadius: 20, padding: "18px 16px 16px", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", boxShadow: "0 24px 80px rgba(0,0,0,0.5)" }}>
+        <div style={{ margin: "16px 14px 0", background: "linear-gradient(135deg, rgba(6,26,53,.82), rgba(2,8,23,.72))", border: `1px solid ${C.line}`, borderRadius: 20, padding: "18px 16px 16px", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", boxShadow: "0 24px 80px rgba(0,0,0,0.45)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ width: 46, height: 46, borderRadius: 14, background: "linear-gradient(135deg,#f6d365,#d4af37)", display: "grid", placeItems: "center", boxShadow: "0 6px 20px rgba(212,175,55,.45)", flex: "0 0 auto" }}><Trophy size={24} color="#2a1d00" /></div>
@@ -216,7 +217,7 @@ export default function App() {
           <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
             <Stat label="SLOTS" value={`${players.length}`} sub={`/${MAX}`} />
             <Stat label={allDrawn ? "TEAMS ALIVE" : "TEAMS LEFT"} value={`${allDrawn ? teamsIn : 48 - claimed}`} sub="/48" />
-            <Stat label="PRIZE KSh" value="24,000" small color={C.gold} />
+            <Stat label="POOL KSh" value="24,000" small color={C.gold} />
             <Stat label="STAGE" value={stageShort(curStage)} small />
           </div>
           {liveMatches.length > 0 && (
@@ -238,7 +239,7 @@ export default function App() {
 
       {/* bottom nav */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 3, backgroundColor: "rgba(2,8,23,.86)", borderTop: `1px solid ${C.line}`, backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" }}>
-        <div style={{ maxWidth: 580, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(5,1fr)" }}>
+        <div style={{ maxWidth: 820, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(5,1fr)" }}>
           {[["draw", "Draw", Dices], ["mine", "My Teams", User], ["pool", "Pool", Trophy], ["matches", "Matches", CalendarDays], ["admin", "Admin", Settings]].map(([id, label, Icon]) => {
             const on = tab === id;
             return (
@@ -412,7 +413,8 @@ function MineView({ players, teamMap, statusOf, aliveCount, myName, setMyName })
       {me && (() => {
         const alive = aliveCount(me);
         const champ = me.picks.some((id) => statusOf(id) === "champion");
-        const b = champ ? { c: C.gold, t: "🏆 WINNER — you take the pot!" } : alive === 0 ? { c: C.red, t: "Out of contention" } : { c: C.teal, t: `Still in — ${alive} alive` };
+        const runner = me.picks.some((id) => statusOf(id) === "runnerup");
+        const b = champ ? { c: C.gold, t: "🥇 1st place — you win KSh 18,000!" } : runner ? { c: C.silver, t: "🥈 2nd place — you win KSh 6,000!" } : alive === 0 ? { c: C.red, t: "Out of contention" } : { c: C.teal, t: `Still in — ${alive} alive` };
         return (
           <Card style={{ borderColor: b.c + "88" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
@@ -426,8 +428,8 @@ function MineView({ players, teamMap, statusOf, aliveCount, myName, setMyName })
                     {t && <Flag id={t.id} size={26} />}
                     <div><div style={{ fontWeight: 800 }}>{t?.name}</div><div style={{ color: C.sub, fontSize: 12 }}>Group {t?.grp}</div></div>
                   </div>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: s === "out" ? C.red : s === "champion" ? C.gold : C.teal, fontWeight: 800, fontSize: 13 }}>
-                    <StatusDot s={s} />{s === "out" ? "Knocked out" : s === "champion" ? "Champion" : "Still in"}
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: s === "out" ? C.red : s === "champion" ? C.gold : s === "runnerup" ? C.silver : C.teal, fontWeight: 800, fontSize: 13 }}>
+                    <StatusDot s={s} />{s === "out" ? "Knocked out" : s === "champion" ? "Champion" : s === "runnerup" ? "Runner-up" : "Still in"}
                   </span>
                 </div>); })}
             </div>
@@ -442,22 +444,27 @@ function MineView({ players, teamMap, statusOf, aliveCount, myName, setMyName })
 
 /* ---------- Pool (player standings) ---------- */
 function PoolView({ players, teamMap, statusOf, aliveCount, championSet }) {
-  const rows = [...players].filter((p) => p.picks.length >= 2).sort((a, b) => {
-    const ca = a.picks.some((i) => statusOf(i) === "champion") ? 1 : 0, cb = b.picks.some((i) => statusOf(i) === "champion") ? 1 : 0;
-    return cb - ca || aliveCount(b) - aliveCount(a) || a.name.localeCompare(b.name);
-  });
+  const rank = (p) => p.picks.some((i) => statusOf(i) === "champion") ? 2 : p.picks.some((i) => statusOf(i) === "runnerup") ? 1 : 0;
+  const rows = [...players].filter((p) => p.picks.length >= 2).sort((a, b) => (rank(b) - rank(a) || aliveCount(b) - aliveCount(a) || a.name.localeCompare(b.name)));
   return (
     <div style={{ display: "grid", gap: 10 }}>
-      <div style={{ color: C.sub, fontSize: 13, padding: "0 2px" }}>{rows.length} players · grand prize <b style={{ color: C.gold }}>KSh 24,000</b> to whoever owns the champion.</div>
+      <div style={{ color: C.sub, fontSize: 13, padding: "0 2px", lineHeight: 1.5 }}>{rows.length} players · <b style={{ color: C.gold }}>🥇 KSh 18,000</b> to the champion’s owner · <b style={{ color: C.silver }}>🥈 KSh 6,000</b> to the runner-up’s owner.</div>
       {rows.length === 0 && <Card style={{ color: C.sub, textAlign: "center" }}>No one has drawn yet.</Card>}
-      {rows.map((p, i) => { const alive = aliveCount(p), champ = p.picks.some((x) => statusOf(x) === "champion"); return (
-        <Card key={p.id} style={{ padding: 13, borderColor: champ ? C.gold : (alive === 0 ? C.red + "66" : C.line), background: champ ? "#1c1604" : C.panel }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+      {rows.map((p, i) => {
+        const alive = aliveCount(p);
+        const champ = p.picks.some((x) => statusOf(x) === "champion");
+        const runner = p.picks.some((x) => statusOf(x) === "runnerup");
+        const edge = champ ? C.gold : runner ? C.silver : (alive === 0 ? C.red + "66" : C.line);
+        const tag = champ ? "🥇 1st · KSh 18,000" : runner ? "🥈 2nd · KSh 6,000" : (alive === 0 ? "OUT" : `${alive} alive`);
+        const tagc = champ ? C.gold : runner ? C.silver : (alive === 0 ? C.red : C.teal);
+        return (
+        <Card key={p.id} style={{ padding: 13, borderColor: edge, background: champ ? "#1c1604" : runner ? "#12161f" : C.panel }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
               <span style={{ color: C.sub, fontSize: 12, width: 16 }}>{i + 1}</span>
               {champ && <Trophy size={15} color={C.gold} />}{p.name}{p.paid && <Check size={13} color={C.teal} />}
             </div>
-            <span style={{ color: alive === 0 ? C.red : C.teal, fontSize: 12, fontWeight: 800 }}>{alive === 0 ? "OUT" : `${alive} alive`}</span>
+            <span style={{ color: tagc, fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>{tag}</span>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{p.picks.map((id) => teamMap[id] && <TeamChip key={id} t={teamMap[id]} status={statusOf(id)} small />)}</div>
         </Card>
@@ -568,8 +575,12 @@ function AdminView({ teams, players, statusOf, teamMap, config, onDone }) {
     const dead = players.filter((p) => p.picks.every((i) => statusOf(i) === "out"));
     const champTeam = config?.champion_team_id ? teamMap[config.champion_team_id] : null;
     const champWinner = champTeam ? players.find((p) => p.picks.includes(config.champion_team_id)) : null;
+    const runnerTeam = config?.runnerup_team_id ? teamMap[config.runnerup_team_id] : null;
+    const runnerWinner = runnerTeam ? players.find((p) => p.picks.includes(config.runnerup_team_id)) : null;
     const L = ["⚽ World Cup 2026 — Pool Update", ""];
-    if (champWinner) L.push(`🏆 WINNER: ${champWinner.name} (${champTeam.flag} ${champTeam.name}) takes KSh 24,000!`, "");
+    if (champWinner) L.push(`🥇 1st: ${champWinner.name} (${champTeam.flag} ${champTeam.name}) — KSh 18,000`);
+    if (runnerWinner) L.push(`🥈 2nd: ${runnerWinner.name} (${runnerTeam.flag} ${runnerTeam.name}) — KSh 6,000`);
+    if (champWinner || runnerWinner) L.push("");
     L.push(`Teams still in: ${48 - out.length}/48`);
     if (out.length) L.push(`Out: ${out.map((t) => t.name).join(", ")}`);
     L.push("", `Still alive (${aliveP.length}): ${aliveP.map((p) => p.name).join(", ") || "—"}`);
@@ -594,8 +605,18 @@ function AdminView({ teams, players, statusOf, teamMap, config, onDone }) {
         <Btn full kind={copied ? "primary" : "ghost"} onClick={() => navigator.clipboard?.writeText(update()).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); })}>{copied ? <><Check size={16} /> Copied</> : <><Copy size={16} /> Copy for WhatsApp</>}</Btn>
       </Card>
       <Card>
-        <div style={{ fontWeight: 800, marginBottom: 10 }}>Champion (auto-set from the final; override here)</div>
+        <div style={{ fontWeight: 800, marginBottom: 4 }}>🥇 Champion — KSh 18,000</div>
+        <div style={{ color: C.sub, fontSize: 12, marginBottom: 10 }}>The team that wins the final (auto-set; override here). 1st place.</div>
         <select value={config?.champion_team_id || ""} onChange={(e) => call("admin_set_champion", { p_pin: pin, p_team: e.target.value })}
+          style={{ width: "100%", padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.05)", border: `1px solid ${C.line}`, color: C.text, fontSize: 15 }}>
+          <option value="">— not decided —</option>
+          {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
+      </Card>
+      <Card>
+        <div style={{ fontWeight: 800, marginBottom: 4 }}>🥈 Runner-up — KSh 6,000</div>
+        <div style={{ color: C.sub, fontSize: 12, marginBottom: 10 }}>The team that loses the final. 2nd place.</div>
+        <select value={config?.runnerup_team_id || ""} onChange={(e) => call("admin_set_runnerup", { p_pin: pin, p_team: e.target.value })}
           style={{ width: "100%", padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.05)", border: `1px solid ${C.line}`, color: C.text, fontSize: 15 }}>
           <option value="">— not decided —</option>
           {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
