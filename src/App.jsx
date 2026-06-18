@@ -8,11 +8,17 @@ import { supabase } from "./supabaseClient.js";
 const MAX = 24, BUYIN = 1000;
 const GROUPS = "ABCDEFGHIJKL".split("");
 const C = {
-  bg: "#0b1020", panel: "#121a30", panel2: "#0e1730", line: "#243150",
-  teal: "#00d2c6", magenta: "#ff2d78", violet: "#7b2ff7", gold: "#ffcf3f",
-  green: "#15c26b", red: "#ff4d4d", text: "#eef3f8", sub: "#93a4c4",
+  bg: "#020817", deep: "#061a35", royal: "#0b5cff", electric: "#38bdf8",
+  panel: "rgba(5,12,25,0.78)", panel2: "rgba(6,26,53,0.62)", line: "rgba(56,189,248,0.25)",
+  teal: "#38bdf8", gold: "#d4af37", green: "#22c55e", red: "#ff4d4d",
+  text: "#ffffff", sub: "#9fb0c8", blue: "#0b5cff",
 };
-const HERO = "linear-gradient(125deg,#ff2d78 0%,#7b2ff7 48%,#00b5b8 100%)";
+const ISO = { mex:"mx", kor:"kr", rsa:"za", cze:"cz", can:"ca", bih:"ba", qat:"qa", sui:"ch", sco:"gb-sct", bra:"br", mar:"ma", hai:"ht", usa:"us", aus:"au", tur:"tr", par:"py", ger:"de", civ:"ci", ecu:"ec", cuw:"cw", swe:"se", ned:"nl", jpn:"jp", tun:"tn", bel:"be", egy:"eg", irn:"ir", nzl:"nz", esp:"es", cpv:"cv", ksa:"sa", uru:"uy", fra:"fr", sen:"sn", nor:"no", irq:"iq", arg:"ar", aut:"at", alg:"dz", jor:"jo", por:"pt", col:"co", uzb:"uz", cod:"cd", eng:"gb-eng", cro:"hr", pan:"pa", gha:"gh" };
+function Flag({ id, size = 14 }) {
+  const code = ISO[id];
+  if (!code) return null;
+  return <img src={`https://flagcdn.com/${code}.svg`} alt="" loading="lazy" style={{ width: Math.round(size * 1.5), height: size, borderRadius: 2, objectFit: "cover", display: "inline-block", verticalAlign: "middle", boxShadow: "0 0 0 1px rgba(255,255,255,.10)", flex: "0 0 auto" }} />;
+}
 
 /* ---------- helpers ---------- */
 const stageLabel = (s) => ({ GROUP_STAGE: "Group Stage", LAST_32: "Round of 32", LAST_16: "Round of 16", QUARTER_FINALS: "Quarter-finals", SEMI_FINALS: "Semi-finals", THIRD_PLACE: "Third place", FINAL: "Final" }[s] || s || "");
@@ -25,7 +31,7 @@ const fmtTime = (d) => new Date(d).toLocaleTimeString(undefined, { hour: "2-digi
 
 /* ---------- atoms ---------- */
 const Card = ({ children, style }) => (
-  <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 16, padding: 16, ...style }}>{children}</div>
+  <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 20, padding: 16, backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", boxShadow: "0 24px 80px rgba(0,0,0,0.5)", ...style }}>{children}</div>
 );
 function StatusDot({ s }) {
   const m = { active: C.teal, out: C.red, champion: C.gold };
@@ -36,7 +42,7 @@ function LiveDot() {
     <span className="livepulse" style={{ width: 7, height: 7, borderRadius: 99, background: C.red, display: "inline-block" }} />LIVE</span>;
 }
 function Btn({ children, onClick, kind = "primary", disabled, full }) {
-  const grad = { primary: HERO, gold: `linear-gradient(90deg,${C.gold},#ffb800)`, red: C.red, ghost: "transparent" }[kind];
+  const grad = { primary: "linear-gradient(135deg,#003b8f,#0b5cff,#38bdf8)", gold: `linear-gradient(90deg,${C.gold},#b8902a)`, red: C.red, ghost: "transparent" }[kind];
   const ghost = kind === "ghost";
   return (
     <button onClick={onClick} disabled={disabled} style={{
@@ -54,17 +60,17 @@ function TeamChip({ t, status, small }) {
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 6, padding: small ? "3px 8px" : "5px 10px",
-      borderRadius: 8, background: "#0c1426", border: `1px solid ${col}44`, color: C.text,
+      borderRadius: 8, background: "rgba(255,255,255,0.05)", border: `1px solid ${col}44`, color: C.text,
       fontSize: small ? 12 : 13, opacity: status === "out" ? 0.5 : 1,
       textDecoration: status === "out" ? "line-through" : "none", whiteSpace: "nowrap",
     }}>
-      <span style={{ fontSize: small ? 13 : 15 }}>{t.flag}</span>{t.name}
+      <Flag id={t.id} size={small ? 12 : 14} />{t.name}
       {status === "champion" && <Trophy size={12} color={C.gold} />}
     </span>
   );
 }
 function Confetti() {
-  const cols = [C.magenta, C.violet, C.teal, C.gold, C.green];
+  const cols = [C.gold, "#f6e7a8", "#ffffff", C.electric, C.royal];
   const bits = Array.from({ length: 36 });
   return (
     <div style={{ position: "fixed", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 50 }}>
@@ -116,6 +122,17 @@ function EnableAlerts({ name }) {
   );
 }
 
+function BgConfetti() {
+  const bits = Array.from({ length: 16 });
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", overflow: "hidden" }}>
+      {bits.map((_, i) => (
+        <span key={i} className="confetti" style={{ left: `${(i * 6.3) % 100}%`, background: i % 3 === 0 ? "#ffffff" : "#d4af37", opacity: 0.45, animationDelay: `${(i % 8) * 1.2}s`, animationDuration: `${7 + (i % 5)}s` }} />
+      ))}
+    </div>
+  );
+}
+
 /* ============================ APP ============================ */
 export default function App() {
   const [teams, setTeams] = useState([]);
@@ -164,7 +181,7 @@ export default function App() {
   const championSet = !!config.champion_team_id;
 
   return (
-    <div className="wc" style={{ background: `radial-gradient(1100px 520px at 50% -8%, rgba(123,47,247,.30), transparent 60%), radial-gradient(820px 430px at 92% 6%, rgba(0,210,198,.16), transparent 55%), radial-gradient(720px 380px at 5% 28%, rgba(255,45,120,.13), transparent 55%), ${C.bg}`, minHeight: "100vh", color: C.text }}>
+    <div className="wc" style={{ background: C.bg, minHeight: "100vh", color: C.text, position: "relative" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap');
         .wc,.wc *{font-family:'Montserrat',system-ui,-apple-system,sans-serif;box-sizing:border-box}
         @keyframes pop{0%{transform:scale(.92);opacity:0}100%{transform:scale(1);opacity:1}}
@@ -176,23 +193,30 @@ export default function App() {
         .confetti{position:absolute;top:-5vh;width:9px;height:14px;border-radius:2px;animation:fall linear infinite}
         @keyframes mq{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}.marquee{animation:mq 32s linear infinite}`}</style>
 
+      <div style={{ position: "fixed", inset: 0, zIndex: 0, backgroundImage: "linear-gradient(180deg, rgba(2,8,23,.55) 0%, rgba(2,8,23,.74) 50%, rgba(2,8,23,.94) 100%), url('https://images.unsplash.com/photo-1745997645080-941f962f1392?q=80&w=2000&auto=format&fit=crop')", backgroundSize: "cover", backgroundPosition: "center", backgroundColor: C.bg }} />
+      <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", background: "radial-gradient(700px 420px at 8% -8%, rgba(190,215,255,.32), transparent 60%), radial-gradient(700px 420px at 92% -8%, rgba(190,215,255,.28), transparent 60%), radial-gradient(950px 360px at 50% 120%, rgba(34,197,94,.18), transparent 64%), radial-gradient(1050px 720px at 50% 44%, rgba(2,8,23,.58), transparent 70%)" }} />
+      <BgConfetti />
+
       {championSet && !reduced.current && <Confetti />}
 
-      <div style={{ maxWidth: 580, margin: "0 auto", padding: "0 0 96px" }}>
+      <div style={{ maxWidth: 580, margin: "0 auto", padding: "0 0 96px", position: "relative", zIndex: 1 }}>
         {/* HERO */}
-        <div className="herog" style={{ background: HERO, padding: "20px 16px 18px", borderBottomLeftRadius: 22, borderBottomRightRadius: 22 }}>
+        <div style={{ margin: "16px 14px 0", background: "linear-gradient(135deg, rgba(6,26,53,.82), rgba(2,8,23,.72))", border: `1px solid ${C.line}`, borderRadius: 20, padding: "18px 16px 16px", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", boxShadow: "0 24px 80px rgba(0,0,0,0.5)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div>
-              <div style={{ fontSize: 11, letterSpacing: 3, fontWeight: 800, opacity: 0.9 }}>FIFA WORLD CUP</div>
-              <div style={{ fontSize: 30, fontWeight: 900, lineHeight: 1, letterSpacing: -0.5 }}>2026</div>
-              <div style={{ fontSize: 12, marginTop: 4, opacity: 0.92, fontWeight: 600 }}>🇨🇦 🇺🇸 🇲🇽 · Winner Takes All</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 46, height: 46, borderRadius: 14, background: "linear-gradient(135deg,#f6d365,#d4af37)", display: "grid", placeItems: "center", boxShadow: "0 6px 20px rgba(212,175,55,.45)", flex: "0 0 auto" }}><Trophy size={24} color="#2a1d00" /></div>
+              <div>
+                <div style={{ fontSize: 11, letterSpacing: 3, fontWeight: 800, opacity: 0.9 }}>FIFA WORLD CUP</div>
+                <div style={{ fontSize: 30, fontWeight: 900, lineHeight: 1, letterSpacing: -0.5 }}>2026</div>
+                <div style={{ fontSize: 12, marginTop: 6, opacity: 0.95, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Flag id="can" size={12} /><Flag id="usa" size={12} /><Flag id="mex" size={12} /><span style={{ marginLeft: 2 }}>· Winner Takes All</span></div>
+              </div>
             </div>
-            <button onClick={loadAll} style={{ background: "rgba(255,255,255,.18)", border: "none", borderRadius: 10, padding: 9, color: "#fff", cursor: "pointer" }}><RefreshCw size={16} /></button>
+            <button onClick={loadAll} style={{ background: "rgba(255,255,255,.16)", border: `1px solid ${C.line}`, borderRadius: 10, padding: 9, color: "#fff", cursor: "pointer" }}><RefreshCw size={16} /></button>
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
             <Stat label="SLOTS" value={`${players.length}`} sub={`/${MAX}`} />
             <Stat label={allDrawn ? "TEAMS ALIVE" : "TEAMS LEFT"} value={`${allDrawn ? teamsIn : 48 - claimed}`} sub="/48" />
-            <Stat label="PRIZE KSh" value="24,000" small />
+            <Stat label="PRIZE KSh" value="24,000" small color={C.gold} />
             <Stat label="STAGE" value={stageShort(curStage)} small />
           </div>
           {liveMatches.length > 0 && (
@@ -213,12 +237,12 @@ export default function App() {
       </div>
 
       {/* bottom nav */}
-      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: "#080d1aee", borderTop: `1px solid ${C.line}`, backdropFilter: "blur(8px)" }}>
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 3, backgroundColor: "rgba(2,8,23,.86)", borderTop: `1px solid ${C.line}`, backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" }}>
         <div style={{ maxWidth: 580, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(5,1fr)" }}>
           {[["draw", "Draw", Dices], ["mine", "My Teams", User], ["pool", "Pool", Trophy], ["matches", "Matches", CalendarDays], ["admin", "Admin", Settings]].map(([id, label, Icon]) => {
             const on = tab === id;
             return (
-              <button key={id} onClick={() => setTab(id)} style={{ background: "none", border: "none", padding: "10px 4px 12px", cursor: "pointer", color: on ? C.teal : C.sub, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, position: "relative" }}>
+              <button key={id} onClick={() => setTab(id)} style={{ background: "none", border: "none", padding: "10px 4px 12px", cursor: "pointer", color: on ? C.electric : C.sub, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, position: "relative" }}>
                 <Icon size={20} />
                 <span style={{ fontSize: 10, fontWeight: 700 }}>{label}</span>
                 {id === "matches" && liveMatches.length > 0 && <span className="livepulse" style={{ position: "absolute", top: 7, right: "30%", width: 7, height: 7, borderRadius: 99, background: C.red }} />}
@@ -234,18 +258,18 @@ function FlagMarquee({ teams }) {
   if (!teams.length) return null;
   const row = [...teams, ...teams];
   return (
-    <div style={{ overflow: "hidden", padding: "7px 0", background: "#0c1426", borderBottom: `1px solid ${C.line}` }}>
+    <div style={{ overflow: "hidden", padding: "9px 0", margin: "12px 14px 0", borderRadius: 14, background: C.panel, border: `1px solid ${C.line}`, backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}>
       <div className="marquee" style={{ display: "flex", gap: 14, fontSize: 19, width: "max-content", paddingLeft: 14 }}>
-        {row.map((t, i) => <span key={i}>{t.flag}</span>)}
+        {row.map((t, i) => <Flag key={i} id={t.id} size={15} />)}
       </div>
     </div>
   );
 }
-function Stat({ label, value, sub, small }) {
+function Stat({ label, value, sub, small, color }) {
   return (
-    <div style={{ flex: 1, background: "rgba(255,255,255,.14)", borderRadius: 12, padding: "9px 8px", textAlign: "center" }}>
-      <div style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, opacity: 0.85 }}>{label}</div>
-      <div style={{ fontSize: small ? 15 : 20, fontWeight: 900, lineHeight: 1.2 }}>{value}<span style={{ fontSize: 12, opacity: 0.8 }}>{sub}</span></div>
+    <div style={{ flex: 1, background: "rgba(6,26,53,0.6)", border: `1px solid ${C.line}`, borderRadius: 14, padding: "10px 8px", textAlign: "center" }}>
+      <div style={{ fontSize: 9, letterSpacing: 1, fontWeight: 700, opacity: 0.8 }}>{label}</div>
+      <div style={{ fontSize: small ? 15 : 20, fontWeight: 900, lineHeight: 1.2, color: color || C.text }}>{value}<span style={{ fontSize: 12, opacity: 0.75 }}>{sub}</span></div>
     </div>
   );
 }
@@ -319,7 +343,7 @@ function DrawView({ players, teams, teamMap, myName, setMyName, reduced, onDone 
           <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 4 }}>🎟️ Join the pool</div>
           <div style={{ color: C.sub, fontSize: 13, marginBottom: 14 }}>Enter your name to reserve a slot. You pay KSh 1,000, and once the organiser confirms it, your two random teams unlock here. First come, first served — 24 slots. Already joined? Enter your name to check your status.</div>
           <input value={myName} onChange={(e) => setMyName(e.target.value)} placeholder="Your name"
-            style={{ width: "100%", padding: "13px 14px", borderRadius: 12, background: "#0c1426", border: `1px solid ${C.line}`, color: C.text, fontSize: 15, marginBottom: 12 }} />
+            style={{ width: "100%", padding: "13px 14px", borderRadius: 12, background: "rgba(255,255,255,0.05)", border: `1px solid ${C.line}`, color: C.text, fontSize: 15, marginBottom: 12 }} />
           {err && <div style={{ color: C.red, fontSize: 13, marginBottom: 10 }}>{err}</div>}
           <Btn full onClick={cont} disabled={busy}><ChevronRight size={18} /> {busy ? "…" : "Continue"}</Btn>
         </Card>
@@ -347,13 +371,13 @@ function DrawView({ players, teams, teamMap, myName, setMyName, reduced, onDone 
       {phase === "reveal" && (
         <Card style={{ textAlign: "center" }}>
           <div style={{ color: C.sub, fontSize: 12, letterSpacing: 1, marginBottom: 10 }}>TEAM {Math.min(shown + 1, 2)} OF 2 · {myName}</div>
-          <div style={{ background: "#0a1226", border: `2px solid ${C.teal}`, borderRadius: 16, padding: "26px 14px", margin: "0 auto 16px", maxWidth: 320 }}>
-            <div style={{ fontSize: 60, lineHeight: 1 }}>{reel?.flag}</div>
+          <div style={{ background: "rgba(255,255,255,0.04)", border: `2px solid ${C.teal}`, borderRadius: 16, padding: "26px 14px", margin: "0 auto 16px", maxWidth: 320 }}>
+            <div style={{ display: "flex", justifyContent: "center" }}>{reel && <Flag id={reel.id} size={50} />}</div>
             <div style={{ fontSize: 21, fontWeight: 900, marginTop: 8 }}>{reel?.name}</div>
             <div style={{ color: C.sub, fontSize: 12 }}>Group {reel?.grp}</div>
           </div>
           {shown >= 1 && <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 16 }}>
-            {result.slice(0, shown).map((t) => <TeamChip key={t.team_id} t={{ name: t.team_name, flag: t.flag }} status="active" />)}
+            {result.slice(0, shown).map((t) => <TeamChip key={t.team_id} t={{ id: t.team_id, name: t.team_name }} status="active" />)}
           </div>}
           {shown === 1 && <Btn full onClick={revealSecond}><Dices size={18} /> Reveal team 2</Btn>}
         </Card>
@@ -364,7 +388,7 @@ function DrawView({ players, teams, teamMap, myName, setMyName, reduced, onDone 
           <div style={{ fontWeight: 900, fontSize: 18, marginTop: 2 }}>You’re in, {myName}!</div>
           <div style={{ color: C.sub, fontSize: 13, margin: "2px 0 14px" }}>Locked in — good luck! 🍀</div>
           <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-            {result.map((t) => <TeamChip key={t.team_id} t={{ name: t.team_name, flag: t.flag }} status="active" />)}
+            {result.map((t) => <TeamChip key={t.team_id} t={{ id: t.team_id, name: t.team_name }} status="active" />)}
           </div>
         </Card>
       )}
@@ -380,7 +404,7 @@ function MineView({ players, teamMap, statusOf, aliveCount, myName, setMyName })
       <Card>
         <div style={{ fontWeight: 800, marginBottom: 10 }}>Find your picks</div>
         <select value={me?.name || ""} onChange={(e) => setMyName(e.target.value)}
-          style={{ width: "100%", padding: "13px 14px", borderRadius: 12, background: "#0c1426", border: `1px solid ${C.line}`, color: C.text, fontSize: 15 }}>
+          style={{ width: "100%", padding: "13px 14px", borderRadius: 12, background: "rgba(255,255,255,0.05)", border: `1px solid ${C.line}`, color: C.text, fontSize: 15 }}>
           <option value="">Select your name…</option>
           {players.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
         </select>
@@ -397,9 +421,9 @@ function MineView({ players, teamMap, statusOf, aliveCount, myName, setMyName })
             </div>
             <div style={{ display: "grid", gap: 10 }}>
               {me.picks.map((id) => { const s = statusOf(id), t = teamMap[id]; return (
-                <div key={id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0c1426", border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px" }}>
+                <div key={id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.05)", border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ fontSize: 28 }}>{t?.flag}</span>
+                    {t && <Flag id={t.id} size={26} />}
                     <div><div style={{ fontWeight: 800 }}>{t?.name}</div><div style={{ color: C.sub, fontSize: 12 }}>Group {t?.grp}</div></div>
                   </div>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: s === "out" ? C.red : s === "champion" ? C.gold : C.teal, fontWeight: 800, fontSize: 13 }}>
@@ -460,7 +484,7 @@ function MatchRow({ m }) {
   const live = isLive(m), done = m.status === "FINISHED";
   const hs = m.home_score, as = m.away_score;
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0c1426", border: `1px solid ${live ? C.red + "66" : C.line}`, borderRadius: 10, padding: "9px 12px" }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.05)", border: `1px solid ${live ? C.red + "66" : C.line}`, borderRadius: 10, padding: "9px 12px" }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 14 }}><span>{m.home || "TBD"}</span><span style={{ color: done || live ? C.text : C.sub }}>{hs ?? ""}</span></div>
         <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 14, marginTop: 2 }}><span>{m.away || "TBD"}</span><span style={{ color: done || live ? C.text : C.sub }}>{as ?? ""}</span></div>
@@ -510,10 +534,10 @@ function Groups({ standings, teams, players, statusOf, teamMap }) {
                 const s = stBy[t.id]; const st = statusOf(t.id); const owner = ownerOf(t.id);
                 const qual = hasStats && s && s.position <= 2;
                 return (
-                  <div key={t.id} style={{ display: "flex", alignItems: "center", background: "#0c1426", border: `1px solid ${qual ? C.green + "66" : C.line}`, borderRadius: 9, padding: "8px 4px 8px 0", opacity: st === "out" ? 0.5 : 1 }}>
+                  <div key={t.id} style={{ display: "flex", alignItems: "center", background: "rgba(255,255,255,0.05)", border: `1px solid ${qual ? C.green + "66" : C.line}`, borderRadius: 9, padding: "8px 4px 8px 0", opacity: st === "out" ? 0.5 : 1 }}>
                     <span style={{ width: 18, textAlign: "center", color: qual ? C.green : C.sub, fontSize: 12, fontWeight: 800 }}>{hasStats ? (s?.position ?? "") : i + 1}</span>
                     <span style={{ flex: 1, display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
-                      <span style={{ fontSize: 17 }}>{t.flag}</span>
+                      <Flag id={t.id} size={15} />
                       <span style={{ fontWeight: 700, fontSize: 13, textDecoration: st === "out" ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
                       {owner && <span style={{ color: C.teal, fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>· {owner.name}</span>}
                     </span>
@@ -556,7 +580,7 @@ function AdminView({ teams, players, statusOf, teamMap, config, onDone }) {
     <Card>
       <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 800, marginBottom: 4 }}><ShieldCheck size={18} color={C.teal} /> Admin access</div>
       <div style={{ color: C.sub, fontSize: 13, marginBottom: 12 }}>Organiser only. Change the default PIN once in.</div>
-      <input value={pin} onChange={(e) => setPin(e.target.value)} type="password" placeholder="PIN" style={{ width: "100%", padding: "13px 14px", borderRadius: 12, background: "#0c1426", border: `1px solid ${C.line}`, color: C.text, fontSize: 15, marginBottom: 12 }} />
+      <input value={pin} onChange={(e) => setPin(e.target.value)} type="password" placeholder="PIN" style={{ width: "100%", padding: "13px 14px", borderRadius: 12, background: "rgba(255,255,255,0.05)", border: `1px solid ${C.line}`, color: C.text, fontSize: 15, marginBottom: 12 }} />
       {pinErr && <div style={{ color: C.red, fontSize: 13, marginBottom: 10 }}>{pinErr}</div>}
       <Btn full onClick={unlock}>Unlock</Btn>
     </Card>
@@ -566,15 +590,15 @@ function AdminView({ teams, players, statusOf, teamMap, config, onDone }) {
       {err && <Card style={{ borderColor: C.red, color: C.red, fontSize: 13 }}>{err}</Card>}
       <Card>
         <div style={{ fontWeight: 800, marginBottom: 10 }}>WhatsApp update</div>
-        <pre style={{ whiteSpace: "pre-wrap", background: "#0c1426", border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, fontSize: 12.5, color: C.text, margin: "0 0 10px", fontFamily: "Montserrat" }}>{update()}</pre>
+        <pre style={{ whiteSpace: "pre-wrap", background: "rgba(255,255,255,0.05)", border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, fontSize: 12.5, color: C.text, margin: "0 0 10px", fontFamily: "Montserrat" }}>{update()}</pre>
         <Btn full kind={copied ? "primary" : "ghost"} onClick={() => navigator.clipboard?.writeText(update()).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); })}>{copied ? <><Check size={16} /> Copied</> : <><Copy size={16} /> Copy for WhatsApp</>}</Btn>
       </Card>
       <Card>
         <div style={{ fontWeight: 800, marginBottom: 10 }}>Champion (auto-set from the final; override here)</div>
         <select value={config?.champion_team_id || ""} onChange={(e) => call("admin_set_champion", { p_pin: pin, p_team: e.target.value })}
-          style={{ width: "100%", padding: "12px 14px", borderRadius: 12, background: "#0c1426", border: `1px solid ${C.line}`, color: C.text, fontSize: 15 }}>
+          style={{ width: "100%", padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.05)", border: `1px solid ${C.line}`, color: C.text, fontSize: 15 }}>
           <option value="">— not decided —</option>
-          {teams.map((t) => <option key={t.id} value={t.id}>{t.flag} {t.name}</option>)}
+          {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
       </Card>
       <Card>
@@ -582,8 +606,8 @@ function AdminView({ teams, players, statusOf, teamMap, config, onDone }) {
         <div style={{ color: C.sub, fontSize: 12, marginBottom: 10 }}>The sync sets these automatically. Use only if the feed lags.</div>
         <div style={{ display: "grid", gap: 6, maxHeight: 240, overflow: "auto" }}>
           {teams.map((t) => { const s = statusOf(t.id); return (
-            <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0c1426", border: `1px solid ${C.line}`, borderRadius: 10, padding: "7px 11px" }}>
-              <span style={{ fontSize: 13 }}>{t.flag} {t.name}</span>
+            <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.05)", border: `1px solid ${C.line}`, borderRadius: 10, padding: "7px 11px" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}><Flag id={t.id} size={13} /> {t.name}</span>
               <button onClick={() => call("admin_set_status", { p_pin: pin, p_team: t.id, p_status: s === "out" ? "active" : "out" })}
                 style={{ border: "none", borderRadius: 8, padding: "4px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer", background: s === "out" ? C.red : C.teal, color: "#04161a" }}>{s === "out" ? "Out" : "In"}</button>
             </div>); })}
@@ -599,7 +623,7 @@ function AdminView({ teams, players, statusOf, teamMap, config, onDone }) {
             const sub = !p.approved ? "Awaiting payment" : drawn ? "Paid · drawn" : "Paid · not drawn yet";
             const subc = !p.approved ? C.red : C.teal;
             return (
-              <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0c1426", border: `1px solid ${C.line}`, borderRadius: 10, padding: "8px 11px" }}>
+              <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.05)", border: `1px solid ${C.line}`, borderRadius: 10, padding: "8px 11px" }}>
                 <span style={{ minWidth: 0 }}>
                   <span style={{ fontWeight: 700, fontSize: 14 }}>{p.name}</span>
                   <span style={{ display: "block", color: subc, fontSize: 11, fontWeight: 600 }}>{sub}</span>
@@ -627,7 +651,7 @@ function PinChanger({ pin, call }) {
   const [v, setV] = useState(""); const [done, setDone] = useState(false);
   return (
     <div style={{ display: "flex", gap: 8 }}>
-      <input value={v} onChange={(e) => setV(e.target.value)} placeholder="New admin PIN" style={{ flex: 1, padding: "11px 12px", borderRadius: 10, background: "#0c1426", border: `1px solid ${C.line}`, color: C.text, fontSize: 14 }} />
+      <input value={v} onChange={(e) => setV(e.target.value)} placeholder="New admin PIN" style={{ flex: 1, padding: "11px 12px", borderRadius: 10, background: "rgba(255,255,255,0.05)", border: `1px solid ${C.line}`, color: C.text, fontSize: 14 }} />
       <Btn kind="ghost" onClick={async () => { if (v.trim()) { await call("admin_set_pin", { p_pin: pin, p_new: v.trim() }); setDone(true); setV(""); setTimeout(() => setDone(false), 1500); } }}>{done ? <Check size={16} /> : "Save"}</Btn>
     </div>
   );
