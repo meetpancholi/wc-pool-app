@@ -123,6 +123,34 @@ function EnableAlerts({ name }) {
   );
 }
 
+function RivalryBg() {
+  return (
+    <>
+      <div style={{ position: "fixed", inset: 0, zIndex: 0, background: "radial-gradient(700px 640px at 0% 6%, rgba(231,76,42,.42), transparent 58%), radial-gradient(420px 520px at -4% 58%, rgba(231,76,42,.22), transparent 60%), radial-gradient(700px 640px at 100% 6%, rgba(38,118,255,.42), transparent 58%), radial-gradient(420px 520px at 104% 58%, rgba(38,118,255,.22), transparent 60%), radial-gradient(360px 240px at 8% -2%, rgba(255,241,214,.22), transparent 60%), radial-gradient(360px 240px at 92% -2%, rgba(214,232,255,.22), transparent 60%), radial-gradient(900px 360px at 50% 122%, rgba(34,197,94,.13), transparent 64%), radial-gradient(1150px 860px at 50% 50%, rgba(2,8,23,.60), transparent 72%), linear-gradient(180deg,#05070f,#020611)" }} />
+      <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 0, pointerEvents: "none", display: "flex", justifyContent: "center" }}>
+        <div style={{ position: "relative", marginTop: "8px" }}>
+          <div style={{ position: "absolute", left: "50%", top: "44%", width: 230, height: 230, transform: "translate(-50%,-50%)", background: "radial-gradient(circle, rgba(212,175,55,.32), transparent 68%)", borderRadius: "50%" }} />
+          <svg width="132" height="168" viewBox="0 0 100 130" style={{ position: "relative", display: "block", filter: "drop-shadow(0 6px 26px rgba(212,175,55,.55))", opacity: 0.95 }}>
+            <defs>
+              <linearGradient id="wcTrophy" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor="#f8e39a" />
+                <stop offset="0.5" stopColor="#d4af37" />
+                <stop offset="1" stopColor="#9c7a1c" />
+              </linearGradient>
+            </defs>
+            <path d="M30 16 H70 V40 Q70 63 50 71 Q30 63 30 40 Z" fill="url(#wcTrophy)" />
+            <path d="M30 21 Q11 23 15 43 Q18 54 31 51" fill="none" stroke="url(#wcTrophy)" strokeWidth="5" strokeLinecap="round" />
+            <path d="M70 21 Q89 23 85 43 Q82 54 69 51" fill="none" stroke="url(#wcTrophy)" strokeWidth="5" strokeLinecap="round" />
+            <rect x="46" y="70" width="8" height="18" fill="url(#wcTrophy)" />
+            <path d="M34 88 H66 L69 101 H31 Z" fill="url(#wcTrophy)" />
+            <rect x="26" y="101" width="48" height="8" rx="2" fill="url(#wcTrophy)" />
+          </svg>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function BgConfetti() {
   const bits = Array.from({ length: 16 });
   return (
@@ -194,15 +222,14 @@ export default function App() {
         .confetti{position:absolute;top:-5vh;width:9px;height:14px;border-radius:2px;animation:fall linear infinite}
         @keyframes mq{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}.marquee{animation:mq 32s linear infinite}`}</style>
 
-      <div style={{ position: "fixed", inset: 0, zIndex: 0, backgroundImage: "linear-gradient(180deg, rgba(2,8,23,.28) 0%, rgba(2,8,23,.44) 45%, rgba(2,8,23,.86) 100%), url('/rivalry.jpg')", backgroundSize: "cover", backgroundPosition: "center top", backgroundColor: C.bg }} />
-      <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", background: "radial-gradient(820px 460px at 50% 6%, rgba(212,175,55,.14), transparent 62%), radial-gradient(1150px 820px at 50% 54%, rgba(2,8,23,.55), transparent 72%)" }} />
+      <RivalryBg />
       <BgConfetti />
 
       {championSet && !reduced.current && <Confetti />}
 
       <div style={{ maxWidth: 820, margin: "0 auto", padding: "0 0 96px", position: "relative", zIndex: 1 }}>
         {/* HERO */}
-        <div style={{ margin: "16px 14px 0", background: "linear-gradient(135deg, rgba(6,26,53,.82), rgba(2,8,23,.72))", border: `1px solid ${C.line}`, borderRadius: 20, padding: "18px 16px 16px", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", boxShadow: "0 24px 80px rgba(0,0,0,0.45)" }}>
+        <div style={{ margin: "78px 14px 0", background: "linear-gradient(135deg, rgba(6,26,53,.82), rgba(2,8,23,.72))", border: `1px solid ${C.line}`, borderRadius: 20, padding: "18px 16px 16px", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", boxShadow: "0 24px 80px rgba(0,0,0,0.45)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ width: 46, height: 46, borderRadius: 14, background: "linear-gradient(135deg,#f6d365,#d4af37)", display: "grid", placeItems: "center", boxShadow: "0 6px 20px rgba(212,175,55,.45)", flex: "0 0 auto" }}><Trophy size={24} color="#2a1d00" /></div>
